@@ -1,6 +1,4 @@
-==============================
 FONCTIONNEMENT DU PROJET
-==============================
 
 principe :
 - Le client demande au master si un chiffre n est premier.
@@ -8,18 +6,13 @@ principe :
 - Une fois la vérification terminée, le master renvoie le résultat au client.
 
 COMMUNICATIONS :
-----------------
 - client <-> master : tubes nommés (mkfifo)
 - master <-> premier worker : pipes anonymes
 - worker <-> worker suivant : pipes anonymes
 - tous les workers -> master : même pipe anonyme partagé pour les réponses
 
-==============================
 ETAPES DE FONCTIONNEMENT
-==============================
-
 1) LANCEMENT DU MASTER
------------------------
 - Le master crée deux tubes nommés (avec mkfifo) :
   - client_to_master.fifo : pour recevoir les demandes du client.
   - master_to_client.fifo : pour envoyer les résultats au client.
@@ -36,7 +29,6 @@ ETAPES DE FONCTIONNEMENT
   - il garde les descripteurs pour écrire vers le worker et lire ses réponses.
 
 2) BOUCLE PRINCIPALE DU MASTER
--------------------------------
 - le master attend une demande d’un client via le tube nommé client_to_master.fifo.
 - quand une demande arrive, il lit le nombre n.
 - il envoie ce nombre dans le pipeline, en commençant par le premier worker (W2).
@@ -45,7 +37,6 @@ ETAPES DE FONCTIONNEMENT
 - puis il retourne attendre une nouvelle demande.
 
 3) COMPORTEMENT D’UN WORKER
-----------------------------
 chaque worker est lancé avec :
     ./worker p fdIn fdToMaster
 
@@ -55,7 +46,6 @@ signification des arguments :
 - fdToMaster : pipe anonyme vers le master pour envoyer les résultats (premier / non premier).
 
 BOUCLE DU WORKER :
-------------------
 1. le worker lit un nombre n depuis fdIn.
 2. il teste plusieurs cas :
    - Cas 1 : n == p
@@ -80,7 +70,6 @@ BOUCLE DU WORKER :
 4. tous les workers partagent le même fdToMaster, donc chacun peut écrire un message au master.
 
 4) COMPORTEMENT DU MASTER APRES LE FORK
-----------------------------------------
 - côté père (master) :
     - garde :
         to_worker[1] pour écrire vers W2
@@ -93,10 +82,7 @@ BOUCLE DU WORKER :
     - exécute "./worker p fdIn fdToMaster"
     - ferme les fd inutiles et entre dans sa boucle principale.
 
-==============================
-EXEMPLE CONCRET : n = 9
-==============================
-
+EXEMPLE  : n = 9
 CLIENT -> MASTER : "est-ce que 9 est premier ?"
 MASTER -> W2 : 9
 W2 (P=2) : 9 % 2 != 0 -> transmet 9 à W3
@@ -105,10 +91,7 @@ MASTER -> CLIENT : "9 n’est pas premier"
 
 Résultat final : 9 n’est pas premier.
 
-==============================
-EXEMPLE CONCRET : n = 5
-==============================
-
+EXEMPLE : n = 5
 CLIENT → MASTER : "est-ce que 5 est premier ?"
 MASTER → W2 : 5
 W2 (P=2) : 5 % 2 != 0 -> pas divisible, pas de worker suivant -> crée W3
