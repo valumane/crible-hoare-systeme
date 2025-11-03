@@ -11,6 +11,12 @@
 
 #include "master_client.h"
 
+
+//ajout fcntl.h pour les opérations sur les fichiers
+#include <fcntl.h>
+//ajout unistd.h pour les opérations POSIX (read, write, close,
+#include <unistd.h>
+
 // chaines possibles pour le premier paramètre de la ligne de commande
 #define TK_STOP      "stop"
 #define TK_COMPUTE   "compute"
@@ -21,7 +27,7 @@
 /************************************************************************
  * Usage et analyse des arguments passés en ligne de commande
  ************************************************************************/
-
+/*
 static void usage(const char *exeName, const char *message)
 {
     fprintf(stderr, "usage : %s <ordre> [<nombre>]\n", exeName);
@@ -75,7 +81,7 @@ static int parseArgs(int argc, char * argv[], int *number)
     
     return order;
 }
-
+*/
 
 /************************************************************************
  * Fonction principale
@@ -84,9 +90,11 @@ static int parseArgs(int argc, char * argv[], int *number)
 int main(int argc, char * argv[])
 {
     int number = 0;
-    int order = parseArgs(argc, argv, &number);
+    /*int order = parseArgs(argc, argv, &number);
     printf("%d\n", order); // pour éviter le warning
-
+*/
+    // nom des tubes nommés
+    
     // order peut valoir 5 valeurs (cf. master_client.h) :
     //      - ORDER_COMPUTE_PRIME_LOCAL
     //      - ORDER_STOP
@@ -104,6 +112,26 @@ int main(int argc, char * argv[])
     //           . les ouvertures sont bloquantes, il faut s'assurer que
     //             le master ouvre les tubes dans le même ordre
     //    - envoyer l'ordre et les données éventuelles au master
+            
+            
+            //on ouvre le tube en écriture seule
+            int fd = open("fifo", O_WRONLY);
+            
+            //on test l'ouverture
+            if (fd == -1){
+                perror("Erreur lors de l'ouverture du tube nommé client_to_master.fifo");
+                exit(EXIT_FAILURE);
+            }
+            
+            //on envoie un nombre d'exemplet
+            int nombre = 42;
+            fwrite(&nombre, sizeof(int), 1, "client_to_master.fifo");
+            printf("Envoi du nombre %d au master\n", nombre);
+            
+
+                
+
+
     //    - attendre la réponse sur le second tube
     //    - sortir de la section critique
     //    - libérer les ressources (fermeture des tubes, ...)

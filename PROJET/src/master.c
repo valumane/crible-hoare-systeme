@@ -18,6 +18,10 @@
 // on peut ici définir une structure stockant tout ce dont le master
 // a besoin
 
+    // nom des tubes nommés
+    const char *fifoClientToMaster = "client_to_master.fifo";
+    const char *fifoMasterToClient = "master_to_client.fifo";
+
 
 /************************************************************************
  * Usage et analyse des arguments passés en ligne de commande
@@ -77,13 +81,45 @@ int main(int argc, char * argv[])
         usage(argv[0], NULL);
 
     // - création des sémaphores
+        // ipc ( mutex_clients, sync_client )
+
     // - création des tubes nommés
+        // client_to_master.fifo : recevoir les demandes du client
+        printf("Création du tube nommé client_to_master.fifo\n");
+        mkfifo(fifoClientToMaster, 0666);
+
+        fopen("client_to_master.fifo", "r"); // ouverture en lecture seule pour éviter EOF immédiat
+        
+
+        
+/*
+        // master_to_client.fifo : pour envoyer les resultats au client
+        printf("Création du tube nommé master_to_client.fifo\n");
+        mkfifo(fifoMasterToClient, 0666);
+*/
+        
+
     // - création du premier worker
+        // creation de deux pipes anonyme :
+            // pipe(to_worker) : pour envoyer des ordres au worker
+            
+
+            // pipe(from_worker) : pour recevoir des réponses du worker
+
+        // fork()
+        // dans le fils :
+            // execv( "worker", {"worker", "2", fdIn, fdToMaster, NULL} )
+        // dans le père :
+            // to_worker[1] : pour ecrire vers worker
+            // from_worker[0] : pour lire worker / pipeline
+            // ferme les extremités inutilisées des pipes
 
     // boucle infinie
     loop(/* paramètres */);
 
     // destruction des tubes nommés, des sémaphores, ...
+        //unlink(fifoClientToMaster);
+        //unlink(fifoMasterToClient);
 
     return EXIT_SUCCESS;
 }

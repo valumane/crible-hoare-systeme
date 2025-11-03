@@ -1,0 +1,62 @@
+compilation :
+gcc -g -Wall -Wextra -pedantic -std=c99 client.c -o client
+gcc -g -Wall -Wextra -pedantic -std=c99 master.c -o master
+
+
+resumé du projet :
+un client demande a un master si un chiffre est premier ou non
+le master demande a des worker successife si oui ou non
+les workers renvoies le resultat au master qui le renvoit au client
+
+plan de projet :
+etape 1 : comunication client vers master ( arrivé a envoyé quelque chose dans le master a partir du client )
+etape 2 : communication master vers client ( faire le retour, envoyé quelque chose dans le client via le master )
+etape 3 : gestion avec les semaphores ( section critique, icp, ....)
+etape 4 : faire la chaine de worker de calcul
+etape 5 : faire la communication master vers worker
+etape 6 : verif + clean + valgrind
+etape 7 : partie client ( bis )
+
+regle : 
+- noté la progression dans le journal 
+- expliqué ce qu'on a fait 
+- ce qu'on a crée et modifié 
+- comment sa fonctionne
+- les trucs a amelioré
+- session <n+1> <prenom> 
+
+session1 lucas :
+deja il faut que le client demande au master et que le master comprene
+
+./master => tube ouvert 
+./client <arg> <n> => envoie les infos dans le tube
+-master capte les infos et les printf
+
+session1 dans "/test client-master"
+
+
+fin de session 1
+resume : 
+usage : 
+- terminal 1 : ./master
+- terminal 2 : ./client 50 ( nbr aleatoire on s'en fou pour l'instant )
+
+ordre : 
+master crée le tube "client_to_master.fifo"
+master ouvre le tube et attend 
+
+on lance le client
+le client ouvre le tube en ecriture
+et il ecrit un nombre ( ici 50 ) dans le tube
+et close le tube
+
+le master detecte l'ecriture du client
+read le nombre
+le printf
+ferme le tube
+le detruit
+
+
+prochain etape : 
+implementé la version minimaliste de client vers master avec les fichiers données et les options specials
+
