@@ -11,6 +11,15 @@
 
 #include "master_client.h"
 
+/**** include ajouté ****/
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <assert.h>
+/***********************/
+
+
 
 //ajout fcntl.h pour les opérations sur les fichiers
 #include <fcntl.h>
@@ -87,9 +96,13 @@ static int parseArgs(int argc, char * argv[], int *number)
  * Fonction principale
  ************************************************************************/
 
-int main(int argc, char * argv[])
-{
-    int number = 0;
+char *fifoClientToMaster = "client_to_master.fifo";
+char *fifoMasterToClient = "master_to_client.fifo";
+
+
+int main(int argc, char * argv[]){
+    
+    int number = 10;
     /*int order = parseArgs(argc, argv, &number);
     printf("%d\n", order); // pour éviter le warning
 */
@@ -114,20 +127,16 @@ int main(int argc, char * argv[])
     //    - envoyer l'ordre et les données éventuelles au master
             
             
-            //on ouvre le tube en écriture seule
-            int fd = open("fifo", O_WRONLY);
-            
-            //on test l'ouverture
-            if (fd == -1){
-                perror("Erreur lors de l'ouverture du tube nommé client_to_master.fifo");
-                exit(EXIT_FAILURE);
-            }
-            
+            //on ouvre le tube nommé en écriture seule
+            int fdSend = open(fifoClientToMaster, O_WRONLY); //j'ouvre le tube en écriture
+            assert(fdSend != -1);// he test su uk a etait ouvert correctement
+          
             //on envoie un nombre d'exemplet
-            int nombre = 42;
-            fwrite(&nombre, sizeof(int), 1, "client_to_master.fifo");
-            printf("Envoi du nombre %d au master\n", nombre);
+            write(fdSend, &number, sizeof(int)); //j'ecrit le nombre dans le tube
+            fprintf(stdout,"Envoi du nombre %d au master\n", number);
             
+            close(fdSend); //je ferme le tube après envoie
+
 
                 
 

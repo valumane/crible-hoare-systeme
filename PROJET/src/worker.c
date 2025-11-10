@@ -22,8 +22,7 @@
  * Usage et analyse des arguments passés en ligne de commande
  ************************************************************************/
 
-static void usage(const char *exeName, const char *message)
-{
+static void usage(const char *exeName, const char *message){
     fprintf(stderr, "usage : %s <n> <fdIn> <fdToMaster>\n", exeName);
     fprintf(stderr, "   <n> : nombre premier géré par le worker\n");
     fprintf(stderr, "   <fdIn> : canal d'entrée pour tester un nombre\n");
@@ -33,8 +32,8 @@ static void usage(const char *exeName, const char *message)
     exit(EXIT_FAILURE);
 }
 
-static void parseArgs(int argc, char * argv[] /*, structure à remplir*/)
-{
+
+static void parseArgs(int argc, char * argv[]){
     if (argc != 4)
         usage(argv[0], "Nombre d'arguments incorrect");
 
@@ -45,8 +44,7 @@ static void parseArgs(int argc, char * argv[] /*, structure à remplir*/)
  * Boucle principale de traitement
  ************************************************************************/
 
-void loop(/* paramètres */)
-{
+/*void loop(){
     // boucle infinie :
     //    attendre l'arrivée d'un nombre à tester
     //    si ordre d'arrêt
@@ -58,22 +56,34 @@ void loop(/* paramètres */)
     //           - s'il y a un worker suivant lui transmettre le nombre
     //           - s'il n'y a pas de worker suivant, le créer
 }
-
+*/
 /************************************************************************
  * Programme principal
  ************************************************************************/
 
-int main(int argc, char * argv[])
-{
-    parseArgs(argc, argv /*, structure à remplir*/);
+int main(int argc, char * argv[]){
+    printf("\n---------------------\n");
+    printf("Debut worker.c main\n");
+
+    //parseArgs(argc, argv /*, structure à remplir*/);
+     
     
     // Si on est créé c'est qu'on est un nombre premier
     // Envoyer au master un message positif pour dire
     // que le nombre testé est bien premier
 
-    loop(/* paramètres */);
+    printf("Worker démarré, pid : %d, pere : %d\n", getpid(), getppid());
+    printf("nombre recu en argument : %s\n", argv[1]);
+
+
+    printf("Worker termine\n");
+    printf("---------------------\n");
+    
+    // loop(/* paramètres */);
 
     // libérer les ressources : fermeture des files descriptors par exemple
+    // le worker est lancé par execv donc pas besoin de libérer de la mémoire
+    
 
     return EXIT_SUCCESS;
 }

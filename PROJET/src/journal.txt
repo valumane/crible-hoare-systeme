@@ -60,3 +60,33 @@ le detruit
 prochain etape : 
 implementé la version minimaliste de client vers master avec les fichiers données et les options specials
 
+session 2 :
+envoie de client vers master fait 
+
+debut master to worker :
+OK ENGROS
+on stocke le plus grand nombre premier et le dernier nombre testé
+premier lancé
+plus grand nombre premier : 2 
+dernier nombre testé : 2 
+j'envoie 2
+le worker 2 est nativement crée
+si je lui envoie 19 ( premier )
+donc il est pas divisibile par 2
+et ducoup on teste tout les nombre de 2 a 11
+2 passe dans le w2
+3 passe pas le w2
+w3 est crée 
+4 capté par w2
+5 passe pas w2 et w3
+w5 est crée 
+6 capté par w2
+7 passe pas w2 w3 w5 
+w7 crée
+8 capté par w2
+9 capté par w3
+10 capté par w2
+11 passe pas w2 w3 w5 w7 
+w11 crée
+11 capté par w11
+11 premier

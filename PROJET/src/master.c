@@ -6,6 +6,14 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+/**** include ajouté ****/
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <assert.h>
+/***********************/
+
 #include "myassert.h"
 
 #include "master_client.h"
@@ -19,9 +27,9 @@
 // a besoin
 
     // nom des tubes nommés
-    const char *fifoClientToMaster = "client_to_master.fifo";
-    const char *fifoMasterToClient = "master_to_client.fifo";
-
+    //const char *fifoClientToMaster = "client_to_master.fifo";
+    //const char *fifoMasterToClient = "master_to_client.fifo";
+    //int res;
 
 /************************************************************************
  * Usage et analyse des arguments passés en ligne de commande
@@ -70,26 +78,55 @@ void loop(/* paramètres */)
     // voyez-vous pourquoi ?
 }
 
+/*********************************************************** *
+ * fonction secondaire
+ * ***********************************************************/
+
+ int createTube(const char *fifoName, int flags){
+    int fd = mkfifo(fifoName, flags);
+    assert(fd != -1);
+    return fd;
+}
+
+/* le client envoie un truc au master, code bougé pour pouvoir commencé la gestion master -> worker
+printf("Création du tube nommé client_to_master.fifo\n");
+        mkfifo(fifoClientToMaster, 0666);
+
+        // ouverture bloquante : attend qu’un client écrive
+        int fdRead = open(fifoClientToMaster, O_RDONLY); //j'ouvre le tube en lecture ( READ ONLY )
+        assert(fdRead != -1); //je test si le tube est bien ouvert
+        fprintf(stdout,"Tube ouvert, en attente d’un nombre...\n"); 
+
+        int nombre;
+        int n = read(fdRead, &nombre, sizeof(int)); // je lis le nombre envoyé par le client
+
+
+        // affichage du nombre reçu
+        if (n == sizeof(int)) {  // si j'ai bien lu un int
+            fprintf(stdout,"Nombre reçu du client : %d\n", nombre);
+        } else if (n == 0) { // le client a fermé le tube
+            fprintf(stdout,"Le client a fermé le tube sans rien envoyer.\n");
+        } else { // erreur de lecture
+            fprintf(stderr,"Erreur de lecture");
+        }
+*/
 
 /************************************************************************
  * Fonction principale
  ************************************************************************/
 
-int main(int argc, char * argv[])
-{
+int main(int argc, char * argv[]){
     if (argc != 1)
         usage(argv[0], NULL);
 
     // - création des sémaphores
         // ipc ( mutex_clients, sync_client )
-
+    
     // - création des tubes nommés
         // client_to_master.fifo : recevoir les demandes du client
-        printf("Création du tube nommé client_to_master.fifo\n");
-        mkfifo(fifoClientToMaster, 0666);
-
-        fopen("client_to_master.fifo", "r"); // ouverture en lecture seule pour éviter EOF immédiat
         
+        
+    
 
         
 /*
@@ -103,6 +140,32 @@ int main(int argc, char * argv[])
         // creation de deux pipes anonyme :
             // pipe(to_worker) : pour envoyer des ordres au worker
             
+            int nombre = atoi(argv[1]);
+            printf("nombre : %d\n", nombre);
+
+            int fd = fork();
+            assert(fd != -1);
+
+            if (fd == 0) // processus fils
+            {
+                // affiché le pid du worker et du pere
+                printf("Processus worker créé, pid : %d, pere : %d\n", getpid(), getppid());
+                // executé le worker avec comme argument nombre
+                int fdWorker = execv( "./worker", (char * const []){"worker", nombre, NULL} );
+                assert(fdWorker != -1);
+                    
+            } // processus père
+            else
+            {
+                // affiché le pid du master et du fils
+                printf("Processus master, pid : %d, fils : %d\n", getpid(), fd);
+            }
+
+
+
+
+
+
 
             // pipe(from_worker) : pour recevoir des réponses du worker
 
@@ -120,6 +183,8 @@ int main(int argc, char * argv[])
     // destruction des tubes nommés, des sémaphores, ...
         //unlink(fifoClientToMaster);
         //unlink(fifoMasterToClient);
+        
+
 
     return EXIT_SUCCESS;
 }
