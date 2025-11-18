@@ -98,8 +98,8 @@ void loop(int fdRead,int hasNext, int nextPipe[2], int fdWriteMaster, int myPrim
           snprintf(fdReadStr, sizeof(fdReadStr), "%d", nextPipe[0]); // lecture du master
           snprintf(fdWriteStr, sizeof(fdWriteStr), "%d", fdWriteMaster); // écriture vers le master
           snprintf(primeStr, sizeof(primeStr), "%d", n); // nouveau premier
-          char *args[] = {"worker", fdReadStr, fdWriteStr, primeStr, NULL}; // exécuter le worker
-          execv("./worker", args);
+          char *args[] = {"worker.o", fdReadStr, fdWriteStr, primeStr, NULL}; // exécuter le worker
+          execv("./worker.o", args);
           perror("execv");
           exit(EXIT_FAILURE);
         }

@@ -176,8 +176,8 @@ int main(void) {
     snprintf(fdWriteStr, sizeof(fdWriteStr), "%d", pipeWM[1]); // écriture vers le master
 
     snprintf(primeStr, sizeof(primeStr), "%d", 2); // premier initial
-    char *args[] = {"worker", fdReadStr, fdWriteStr, primeStr, NULL};
-    execv("./worker", args);
+    char *args[] = {"worker.o", fdReadStr, fdWriteStr, primeStr, NULL};
+    execv("./worker.o", args);
     perror("execv"); 
     exit(EXIT_FAILURE);
   }
