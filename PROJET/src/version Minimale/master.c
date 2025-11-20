@@ -26,9 +26,6 @@
 // on peut ici définir une structure stockant tout ce dont le master
 // a besoin
 
-const char *fifoClientToMaster = "client_to_master.fifo";
-const char *fifoMasterToClient = "master_to_client.fifo";
-
 int last_tested = 2;
 int highest_prime = 2;
 int nb_primes = 0;  // nombre de nombres premiers trouvés
@@ -61,18 +58,17 @@ void order_stop(int pipeMW[2]) {
     perror("[MASTER] write stopVal");
   }
 
-  int fdRetour = open(fifoMasterToClient, O_WRONLY);
+  int fdRetour = open(FIFO_MASTER_TO_CLIENT, O_WRONLY);
   if (fdRetour != -1) {
     int ack = 0;
     write(fdRetour, &ack, sizeof(ack));
     close(fdRetour);
   } else {
-    perror("[MASTER] open fifoMasterToClient (STOP)");
+    perror("[MASTER] open FIFO_MASTER_TO_CLIENT (STOP)");
   }
 
   printf("[MASTER] Ordre STOP traité, on sort de la boucle.\n");
 }
-
 
 // order compute
 void order_compute(int nombre, int pipeMW[2], int pipeWM[2]) {
@@ -120,7 +116,7 @@ void order_compute(int nombre, int pipeMW[2], int pipeWM[2]) {
   printf(" nbprime : %d\n", nb_primes);
 
   // Envoi du résultat au client
-  int fdRetour = open(fifoMasterToClient, O_WRONLY);
+  int fdRetour = open(FIFO_MASTER_TO_CLIENT, O_WRONLY);
   printf(" nbprime : %d\n", nb_primes);
   if (fdRetour != -1) {
     write(fdRetour, &isPrime, sizeof(isPrime));
@@ -128,7 +124,7 @@ void order_compute(int nombre, int pipeMW[2], int pipeWM[2]) {
     close(fdRetour);
   } else {
     printf(" nbprime : %d\n", nb_primes);
-    perror("[MASTER] open fifoMasterToClient (COMPUTE)");
+    perror("[MASTER] open FIFO_MASTER_TO_CLIENT (COMPUTE)");
   }
 
   printf("[MASTER] Résultat envoyé au client : %d (%s)\n", isPrime,
@@ -142,9 +138,9 @@ void order_compute(int nombre, int pipeMW[2], int pipeWM[2]) {
 void loop(int pipeMW[2], int pipeWM[2]) {
   while (1) {  // boucle principale du master
     // === Ouverture de la FIFO côté client ===
-    int fdClient = open(fifoClientToMaster, O_RDONLY);
+    int fdClient = open(FIFO_CLIENT_TO_MASTER, O_RDONLY);
     if (fdClient == -1) {
-      perror("[MASTER] open fifoClientToMaster");
+      perror("[MASTER] open FIFO_CLIENT_TO_MASTER");
       continue;
     }
 
@@ -202,23 +198,23 @@ void loop(int pipeMW[2], int pipeWM[2]) {
 
     /*// 3) HOW_MANY : renvoyer nb_primes
     else if (order == ORDER_HOW_MANY_PRIME) {
-      int fdRetour = open(fifoMasterToClient, O_WRONLY);
+      int fdRetour = open(FIFO_MASTER_TO_CLIENT, O_WRONLY);
       if (fdRetour != -1) {
         write(fdRetour, &nb_primes, sizeof(nb_primes));
         close(fdRetour);
       } else {
-        perror("[MASTER] open fifoMasterToClient (HOW_MANY)");
+        perror("[MASTER] open FIFO_MASTER_TO_CLIENT (HOW_MANY)");
       }
     }*/
 
     // 4) HIGHEST : renvoyer highest_prime
     else if (order == ORDER_HIGHEST_PRIME) {
-      int fdRetour = open(fifoMasterToClient, O_WRONLY);
+      int fdRetour = open(FIFO_MASTER_TO_CLIENT, O_WRONLY);
       if (fdRetour != -1) {
         write(fdRetour, &highest_prime, sizeof(highest_prime));
         close(fdRetour);
       } else {
-        perror("[MASTER] open fifoMasterToClient (HIGHEST)");
+        perror("[MASTER] open FIFO_MASTER_TO_CLIENT (HIGHEST)");
       }
     }
   }
@@ -232,8 +228,7 @@ int main(void) {
   printf("[MASTER] Démarrage du master\n");
 
   // création des FIFOs
-  mkfifo(fifoClientToMaster, 0666);
-  mkfifo(fifoMasterToClient, 0666);
+  createFifos();
 
   // création des pipes de communication avec le worker
   int pipeMW[2];  // master -> worker
@@ -246,8 +241,8 @@ int main(void) {
 
   if (pid == 0) {  // processus worker
     // fermer les descripteurs inutiles
-    close(pipeMW[1]);  // écriture vers le worker
-    close(pipeWM[0]);  // lecture depuis le worker
+    closePipes(pipeMW[1],
+               pipeWM[0]);  // écriture vers le worker lecture depuis le worker
 
     // exécuter le worker
     char fdReadStr[10], fdWriteStr[10], primeStr[10];
@@ -263,18 +258,18 @@ int main(void) {
     exit(EXIT_FAILURE);
   }
 
-  close(pipeMW[0]);            // fermer le pipe de lecture vers le worker
-  close(pipeWM[1]);            // fermer le pipe d'écriture depuis le worker
-  set_nonblocking(pipeWM[0]);  // lecture non bloquante
+  closePipes(pipeMW[0], pipeWM[1]);  // fermer le pipe de lecture vers le worker
+                                     // et ecriture depuis le worker
+  set_nonblocking(pipeWM[0]);        // lecture non bloquante
 
   // boucle principale de communication avec le client
   loop(pipeMW, pipeWM);
 
   // envoi du signal d'arrêt au worker
-  close(pipeMW[1]);            // fermer le pipe d'écriture vers le worker
-  close(pipeWM[0]);            // fermer le pipe de lecture depuis le worker
-  unlink(fifoClientToMaster);  // supprimer la FIFO client->master
-  unlink(fifoMasterToClient);  // supprimer la FIFO master->client
+  closePipes(pipeMW[1],
+             pipeWM[0]);  // fermer le pipe d'écriture / lecture vers le worker
+  unlinkPipes();           //
   printf("[MASTER] Fermeture propre du master.\n");
+
   return EXIT_SUCCESS;
 }

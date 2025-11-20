@@ -6,6 +6,12 @@
 //    - des fonctions communes (création tubes, écriture dans un tube,
 //      manipulation de sémaphores, ...)
 
+
+// Fichiers FIFO
+#define FIFO_CLIENT_TO_MASTER "client_to_master.fifo"
+#define FIFO_MASTER_TO_CLIENT "master_to_client.fifo"
+
+
 // ordres possibles pour le master
 #define ORDER_NONE                0
 #define ORDER_STOP               -1
@@ -17,5 +23,9 @@
 // bref n'hésitez à mettre nombre de fonctions avec des noms explicites
 // pour masquer l'implémentation
 
+
+void createFifos(); //crée les fifos 
+void closePipes(int pipe1, int pipe2); // ferme les pipes
+void unlinkPipes(); //supprime les pipes
 
 #endif

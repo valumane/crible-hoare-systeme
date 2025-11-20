@@ -8,8 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../myassert.h"
 #include "master_client.h"
+#include "myassert.h"
 
 /* include ajouté */
 #include <assert.h>
@@ -98,9 +98,6 @@ static int parseArgs(int argc, char *argv[], int *number) {
  * Fonction principale
  ************************************************************************/
 
-const char *fifoClientToMaster = "client_to_master.fifo";
-const char *fifoMasterToClient = "master_to_client.fifo";
-
 int main(int argc, char *argv[]) {
   int number = 0;
   int order = parseArgs(argc, argv, &number);
@@ -112,9 +109,9 @@ int main(int argc, char *argv[]) {
   }
 
   // === Envoi de l'ordre (et éventuellement du nombre) au master ===
-  int fdWrite = open(fifoClientToMaster, O_WRONLY);
+  int fdWrite = open(FIFO_CLIENT_TO_MASTER, O_WRONLY);
   if (fdWrite == -1) {
-    perror("[CLIENT] open fifoClientToMaster");
+    perror("[CLIENT] open FIFO_CLIENT_TO_MASTER");
     return EXIT_FAILURE;
   }
 
@@ -143,9 +140,9 @@ int main(int argc, char *argv[]) {
   close(fdWrite);
 
   // === Réception de la réponse du master ===
-  int fdRead = open(fifoMasterToClient, O_RDONLY);
+  int fdRead = open(FIFO_MASTER_TO_CLIENT, O_RDONLY);
   if (fdRead == -1) {
-    perror("[CLIENT] open fifoMasterToClient");
+    perror("[CLIENT] open FIFO_MASTER_TO_CLIENT");
     return EXIT_FAILURE;
   }
 
