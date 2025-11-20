@@ -46,6 +46,97 @@ static void usage(const char *exeName, const char *message) {
 }
 
 /************************************************************************
+ * fonction secondaires *
+ ***********************************************************************/
+// rend un pipe non bloquant
+void set_nonblocking(int fd) {
+  int flags = fcntl(fd, F_GETFL, 0);
+  fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
+
+// order stop
+void order_stop(int pipeMW[2]) {
+  int stopVal = -1;
+  if (write(pipeMW[1], &stopVal, sizeof(stopVal)) != sizeof(stopVal)) {
+    perror("[MASTER] write stopVal");
+  }
+
+  int fdRetour = open(fifoMasterToClient, O_WRONLY);
+  if (fdRetour != -1) {
+    int ack = 0;
+    write(fdRetour, &ack, sizeof(ack));
+    close(fdRetour);
+  } else {
+    perror("[MASTER] open fifoMasterToClient (STOP)");
+  }
+
+  printf("[MASTER] Ordre STOP traité, on sort de la boucle.\n");
+}
+
+
+// order compute
+void order_compute(int nombre, int pipeMW[2], int pipeWM[2]) {
+  printf(" nbprime : %d\n", nb_primes);
+
+  // Envoi du ou des nombres dans le pipeline
+  if (nombre > last_tested) {
+    for (int i = last_tested + 1; i <= nombre; i++) {
+      printf(" nbprime : %d\n", nb_primes);
+      if (write(pipeMW[1], &i, sizeof(i)) != sizeof(i)) {
+        printf(" nbprime : %d\n", nb_primes);
+        perror("[MASTER] write pipeMW");
+        break;
+      }
+    }
+    last_tested = nombre;
+  } else {
+    if (write(pipeMW[1], &nombre, sizeof(nombre)) != sizeof(nombre)) {
+      perror("[MASTER] write pipeMW (nombre)");
+      printf(" nbprime : %d\n", nb_primes);
+    }
+  }
+
+  // Lecture des nouveaux premiers trouvés
+  printf(" nbprime : %d\n", nb_primes);
+  int prime;
+  while (read(pipeWM[0], &prime, sizeof(prime)) > 0) {
+    printf(" nbprime : %d\n", nb_primes);
+    highest_prime = prime;
+    nb_primes++;
+    printf("[MASTER] Nouveau nombre premier trouvé : %d\n", prime);
+  }
+
+  // Test local (temporaire)
+  int isPrime = 1;
+  printf(" nbprime : %d\n", nb_primes);
+  for (int i = 2; i * i <= nombre; i++) {
+    printf(" nbprime : %d\n", nb_primes);
+    if (nombre % i == 0) {
+      printf(" nbprime : %d\n", nb_primes);
+      isPrime = 0;
+      break;
+    }
+  }
+  printf(" nbprime : %d\n", nb_primes);
+
+  // Envoi du résultat au client
+  int fdRetour = open(fifoMasterToClient, O_WRONLY);
+  printf(" nbprime : %d\n", nb_primes);
+  if (fdRetour != -1) {
+    write(fdRetour, &isPrime, sizeof(isPrime));
+    printf(" nbprime : %d\n", nb_primes);
+    close(fdRetour);
+  } else {
+    printf(" nbprime : %d\n", nb_primes);
+    perror("[MASTER] open fifoMasterToClient (COMPUTE)");
+  }
+
+  printf("[MASTER] Résultat envoyé au client : %d (%s)\n", isPrime,
+         isPrime ? "premier" : "non premier");
+  printf(" nbprime : %d\n", nb_primes);
+}
+
+/************************************************************************
  * boucle principale de communication avec le client
  ************************************************************************/
 void loop(int pipeMW[2], int pipeWM[2]) {
@@ -100,72 +191,16 @@ void loop(int pipeMW[2], int pipeWM[2]) {
 
     // 1) STOP : on propage -1 aux workers et on répond au client
     if (order == ORDER_STOP) {
-      int stopVal = -1;
-      if (write(pipeMW[1], &stopVal, sizeof(stopVal)) != sizeof(stopVal)) {
-        perror("[MASTER] write stopVal");
-      }
-
-      int fdRetour = open(fifoMasterToClient, O_WRONLY);
-      if (fdRetour != -1) {
-        int ack = 0;
-        write(fdRetour, &ack, sizeof(ack));
-        close(fdRetour);
-      } else {
-        perror("[MASTER] open fifoMasterToClient (STOP)");
-      }
-
-      printf("[MASTER] Ordre STOP traité, on sort de la boucle.\n");
-      break;  // sortie de loop()
+      order_stop(pipeMW);
+      break;  // sortir de la boucle principale
     }
 
     // 2) COMPUTE_PRIME : on garde ton pipeline + test local pour l'instant
     if (order == ORDER_COMPUTE_PRIME) {
-      // Envoi du ou des nombres dans le pipeline
-      if (nombre > last_tested) {
-        for (int i = last_tested + 1; i <= nombre; i++) {
-          if (write(pipeMW[1], &i, sizeof(i)) != sizeof(i)) {
-            perror("[MASTER] write pipeMW");
-            break;
-          }
-        }
-        last_tested = nombre;
-      } else {
-        if (write(pipeMW[1], &nombre, sizeof(nombre)) != sizeof(nombre)) {
-          perror("[MASTER] write pipeMW (nombre)");
-        }
-      }
-
-      // Lecture non bloquante des nouveaux premiers trouvés
-      int prime;
-      while (read(pipeWM[0], &prime, sizeof(prime)) > 0) {
-        highest_prime = prime;
-        nb_primes++;  // on compte les nouveaux premiers détectés
-        printf("[MASTER] Nouveau nombre premier trouvé : %d\n", prime);
-      }
-
-      // Test local (temporaire) pour savoir si "nombre" est premier
-      int isPrime = 1;
-      for (int i = 2; i * i <= nombre; i++) {
-        if (nombre % i == 0) {
-          isPrime = 0;
-          break;
-        }
-      }
-
-      // Envoi du résultat au client
-      int fdRetour = open(fifoMasterToClient, O_WRONLY);
-      if (fdRetour != -1) {
-        write(fdRetour, &isPrime, sizeof(isPrime));
-        close(fdRetour);
-      } else {
-        perror("[MASTER] open fifoMasterToClient (COMPUTE)");
-      }
-
-      printf("[MASTER] Résultat envoyé au client : %d (%s)\n", isPrime,
-             isPrime ? "premier" : "non premier");
+      order_compute(nombre, pipeMW, pipeWM);
     }
 
-    // 3) HOW_MANY : renvoyer nb_primes
+    /*// 3) HOW_MANY : renvoyer nb_primes
     else if (order == ORDER_HOW_MANY_PRIME) {
       int fdRetour = open(fifoMasterToClient, O_WRONLY);
       if (fdRetour != -1) {
@@ -174,7 +209,7 @@ void loop(int pipeMW[2], int pipeWM[2]) {
       } else {
         perror("[MASTER] open fifoMasterToClient (HOW_MANY)");
       }
-    }
+    }*/
 
     // 4) HIGHEST : renvoyer highest_prime
     else if (order == ORDER_HIGHEST_PRIME) {
@@ -187,15 +222,6 @@ void loop(int pipeMW[2], int pipeWM[2]) {
       }
     }
   }
-}
-
-/************************************************************************
- * fonction secondaires *
- ***********************************************************************/
-// rend un pipe non bloquant
-void set_nonblocking(int fd) {
-  int flags = fcntl(fd, F_GETFL, 0);
-  fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
 
 /************************************************************************

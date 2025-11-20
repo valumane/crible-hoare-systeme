@@ -52,18 +52,7 @@ static void parseArgs(int argc, char * argv[] /*, structure à remplir*/){
  * Boucle principale de traitement
  ************************************************************************/
 
-void loop(int fdRead,int hasNext, int nextPipe[2], int fdWriteMaster, int myPrime, pid_t nextPid) {
-     /*boucle infinie :
-        attendre l'arrivée d'un nombre à tester
-        si ordre d'arrêt
-           si il y a un worker suivant, transmettre l'ordre et attendre sa fin
-           sortir de la boucle
-        sinon c'est un nombre à tester, 4 possibilités :
-               - le nombre est premier
-               - le nombre n'est pas premier
-               - s'il y a un worker suivant lui transmettre le nombre
-               - s'il n'y a pas de worker suivant, le créer */
-               
+void loop(int fdRead,int hasNext, int nextPipe[2], int fdWriteMaster, int myPrime, pid_t nextPid) {               
     while (1) {
     int n;
     int r = read(fdRead, &n, sizeof(int));
