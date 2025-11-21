@@ -1,4 +1,3 @@
-
 #if defined HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -9,13 +8,31 @@
 #include <string.h>
 
 #include "master_client.h"
-#include "myassert.h"
 
-/* include ajouté */
+/* include ajoutés */
 #include <assert.h>
 #include <fcntl.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
 #include <unistd.h>
 /******************/
+
+/************** Opérations P/V **************/
+void P(int semid) {
+  struct sembuf op = {0, -1, 0};
+  if (semop(semid, &op, 1) == -1) {
+    perror("semop P");
+    assert(0);
+  }
+}
+
+void V(int semid) {
+  struct sembuf op = {0, +1, 0};
+  if (semop(semid, &op, 1) == -1) {
+    perror("semop V");
+    assert(0);
+  }
+}
 
 /************** debut **************/
 // chaines possibles pour le premier paramètre de la ligne de commande
@@ -94,68 +111,11 @@ static int parseArgs(int argc, char *argv[], int *number) {
   return order;
 }
 
-/************************************************************************
- * Fonction principale
- ************************************************************************/
+/********************* */
+/* secondaire */
+/********************* */
 
-int main(int argc, char *argv[]) {
-  int number = 0;
-  int order = parseArgs(argc, argv, &number);
-
-  // Cas particulier : mode local -> ne concerne pas le master
-  if (order == ORDER_COMPUTE_PRIME_LOCAL) {
-    printf("[CLIENT] Mode local pas encore implémenté.\n");
-    return EXIT_SUCCESS;
-  }
-
-  // === Envoi de l'ordre (et éventuellement du nombre) au master ===
-  int fdWrite = open(FIFO_CLIENT_TO_MASTER, O_WRONLY);
-  if (fdWrite == -1) {
-    perror("[CLIENT] open FIFO_CLIENT_TO_MASTER");
-    return EXIT_FAILURE;
-  }
-
-  /* on envoie d'abord l'ordre */
-  if (write(fdWrite, &order, sizeof(order)) != sizeof(order)) {
-    perror("[CLIENT] write ordre");
-    close(fdWrite);
-    return EXIT_FAILURE;
-  }
-
-  if (order == ORDER_COMPUTE_PRIME) {
-    if (write(fdWrite, &number, sizeof(number)) != sizeof(number)) {
-      perror("[CLIENT] write number");
-      close(fdWrite);
-      return EXIT_FAILURE;
-    }
-    printf("[CLIENT] Envoi de l'ordre COMPUTE pour %d au master\n", number);
-  } else if (order == ORDER_STOP) {
-    printf("[CLIENT] Envoi de l'ordre STOP au master\n");
-  } else if (order == ORDER_HOW_MANY_PRIME) {
-    printf("[CLIENT] Envoi de l'ordre HOW_MANY au master\n");
-  } else if (order == ORDER_HIGHEST_PRIME) {
-    printf("[CLIENT] Envoi de l'ordre HIGHEST au master\n");
-  }
-
-  close(fdWrite);
-
-  // === Réception de la réponse du master ===
-  int fdRead = open(FIFO_MASTER_TO_CLIENT, O_RDONLY);
-  if (fdRead == -1) {
-    perror("[CLIENT] open FIFO_MASTER_TO_CLIENT");
-    return EXIT_FAILURE;
-  }
-
-  int resultat;
-  ssize_t n = read(fdRead, &resultat, sizeof(resultat));
-  close(fdRead);
-
-  if (n != (ssize_t)sizeof(resultat)) {
-    fprintf(stderr, "[CLIENT] Aucune réponse valide du master.\n");
-    return EXIT_FAILURE;
-  }
-
-  // Interprétation de la réponse en fonction de l'ordre
+void interpretOrder(int order, int number, int resultat) {
   switch (order) {
     case ORDER_COMPUTE_PRIME:
       if (resultat)
@@ -181,6 +141,112 @@ int main(int argc, char *argv[]) {
              resultat);
       break;
   }
+}
+
+/************************************************************************
+ * Fonction principale
+ ************************************************************************/
+
+int main(int argc, char *argv[]) {
+  // === Récupération des sémaphores créés par le master ===
+
+  key_t key_mutex = ftok("master.c", 'M');
+  if (key_mutex == -1) {
+    perror("ftok mutex");
+    assert(0);
+  }
+
+  key_t key_sync = ftok("master.c", 'S');
+  if (key_sync == -1) {
+    perror("ftok sync");
+    assert(0);
+  }
+
+  int sem_mutex = semget(key_mutex, 1, 0666);
+  if (sem_mutex == -1) {
+    perror("semget mutex");
+    assert(0);
+  }
+
+  int sem_sync = semget(key_sync, 1, 0666);
+  if (sem_sync == -1) {
+    perror("semget sync");
+    assert(0);
+  }
+
+  int number = 0;
+  int order = parseArgs(argc, argv, &number);
+
+  // Cas particulier : mode local -> indépendant
+  if (order == ORDER_COMPUTE_PRIME_LOCAL) {
+    printf("[CLIENT] Mode local pas encore implémenté.\n");
+    return EXIT_SUCCESS;
+  }
+
+  /***********************
+   * SECTION CRITIQUE
+   ************************/
+  /**/ P(sem_mutex);
+
+  // === Envoi ===
+  int fdWrite = open(FIFO_CLIENT_TO_MASTER, O_WRONLY);
+  if (fdWrite == -1) {
+    perror("[CLIENT] open FIFO_CLIENT_TO_MASTER");
+    V(sem_mutex);
+    return EXIT_FAILURE;
+  }
+
+  if (write(fdWrite, &order, sizeof(order)) != sizeof(order)) {
+    perror("[CLIENT] write ordre");
+    close(fdWrite);
+    V(sem_mutex);
+    return EXIT_FAILURE;
+  }
+
+  if (order == ORDER_COMPUTE_PRIME) {
+    if (write(fdWrite, &number, sizeof(number)) != sizeof(number)) {
+      perror("[CLIENT] write number");
+      close(fdWrite);
+      V(sem_mutex);
+      return EXIT_FAILURE;
+    }
+    printf("[CLIENT] Envoi de l'ordre COMPUTE pour %d au master\n", number);
+  } else if (order == ORDER_STOP) {
+    printf("[CLIENT] Envoi de l'ordre STOP au master\n");
+  } else if (order == ORDER_HOW_MANY_PRIME) {
+    printf("[CLIENT] Envoi HOW_MANY\n");
+  } else if (order == ORDER_HIGHEST_PRIME) {
+    printf("[CLIENT] Envoi HIGHEST\n");
+  }
+
+  close(fdWrite);
+
+  // === Réception ===
+  int fdRead = open(FIFO_MASTER_TO_CLIENT, O_RDONLY);
+  if (fdRead == -1) {
+    perror("[CLIENT] open FIFO_MASTER_TO_CLIENT");
+    V(sem_mutex);
+    return EXIT_FAILURE;
+  }
+
+  int resultat;
+  ssize_t n = read(fdRead, &resultat, sizeof(resultat));
+  close(fdRead);
+
+  if (n != (ssize_t)sizeof(resultat)) {
+    fprintf(stderr, "[CLIENT] Aucune réponse valide du master.\n");
+    V(sem_mutex);
+    return EXIT_FAILURE;
+  }
+
+  // FIN SECTION CRITIQUE
+  V(sem_mutex);
+
+  // Le client signale au master qu'il a fini
+  V(sem_sync);
+
+  // Interprétation
+  interpretOrder(order, number, resultat);
 
   return EXIT_SUCCESS;
 }

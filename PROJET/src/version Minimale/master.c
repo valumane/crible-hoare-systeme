@@ -8,152 +8,153 @@
 
 #include "master_client.h"
 #include "master_worker.h"
-#include "myassert.h"
 
-/* include ajouté */
+/* includes ajoutés */
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
 #include <sys/stat.h>
 #include <unistd.h>
 /******************/
 
 /************************************************************************
- * Données persistantes d'un master
- ************************************************************************/
-
-// on peut ici définir une structure stockant tout ce dont le master
-// a besoin
-
-int last_tested = 2;
-int highest_prime = 2;
-int nb_primes = 0;  // nombre de nombres premiers trouvés
-
-/************************************************************************
  * Usage et analyse des arguments passés en ligne de commande
  ************************************************************************/
-
 static void usage(const char *exeName, const char *message) {
   fprintf(stderr, "usage : %s\n", exeName);
-  if (message != NULL) {
-    fprintf(stderr, "message : %s\n", message);
-  }
+  if (message != NULL) fprintf(stderr, "message : %s\n", message);
   exit(EXIT_FAILURE);
 }
 
 /************************************************************************
- * fonction secondaires *
+ * Données persistantes du master
+ ************************************************************************/
+
+int last_tested = 2;
+int highest_prime = 2;
+int nb_primes = 0;
+
+// Sémaphores IPC
+int sem_mutex;  // protège la section critique client-master
+int sem_sync;   // synchronisation client -> master
+
+/************************************************************************
+ * Fonctions P/V
+ ************************************************************************/
+void P(int semid) {
+  struct sembuf op = {0, -1, 0};
+  int r = semop(semid, &op, 1);
+  if (r == -1) {
+    perror("semop P");
+    assert(0);
+  }
+}
+
+void V(int semid) {
+  struct sembuf op = {0, +1, 0};
+  int r = semop(semid, &op, 1);
+  if (r == -1) {
+    perror("semop V");
+    assert(0);
+  }
+}
+
+/************************************************************************
+ * Fonctions secondaires
  ***********************************************************************/
-// rend un pipe non bloquant
 void set_nonblocking(int fd) {
   int flags = fcntl(fd, F_GETFL, 0);
   fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
 
-// order stop
+// STOP
 void order_stop(int pipeMW[2]) {
   int stopVal = -1;
-  if (write(pipeMW[1], &stopVal, sizeof(stopVal)) != sizeof(stopVal)) {
-    perror("[MASTER] write stopVal");
-  }
+  write(pipeMW[1], &stopVal, sizeof(stopVal));
 
   int fdRetour = open(FIFO_MASTER_TO_CLIENT, O_WRONLY);
   if (fdRetour != -1) {
     int ack = 0;
     write(fdRetour, &ack, sizeof(ack));
     close(fdRetour);
-  } else {
-    perror("[MASTER] open FIFO_MASTER_TO_CLIENT (STOP)");
   }
 
-  printf("[MASTER] Ordre STOP traité, on sort de la boucle.\n");
+  printf("[MASTER] Ordre STOP traité.\n");
 }
 
-// order compute
+/************************************************************************
+ * order_compute — pipeline Hoare
+ ************************************************************************/
 void order_compute(int nombre, int pipeMW[2], int pipeWM[2]) {
-  printf(" nbprime : %d\n", nb_primes);
-
-  // Envoi du ou des nombres dans le pipeline
   if (nombre > last_tested) {
     for (int i = last_tested + 1; i <= nombre; i++) {
-      printf(" nbprime : %d\n", nb_primes);
       if (write(pipeMW[1], &i, sizeof(i)) != sizeof(i)) {
-        printf(" nbprime : %d\n", nb_primes);
         perror("[MASTER] write pipeMW");
         break;
       }
     }
     last_tested = nombre;
   } else {
-    if (write(pipeMW[1], &nombre, sizeof(nombre)) != sizeof(nombre)) {
-      perror("[MASTER] write pipeMW (nombre)");
-      printf(" nbprime : %d\n", nb_primes);
-    }
+    write(pipeMW[1], &nombre, sizeof(nombre));
   }
 
-  // Lecture des nouveaux premiers trouvés
-  printf(" nbprime : %d\n", nb_primes);
   int prime;
   while (read(pipeWM[0], &prime, sizeof(prime)) > 0) {
-    printf(" nbprime : %d\n", nb_primes);
     highest_prime = prime;
     nb_primes++;
-    printf("[MASTER] Nouveau nombre premier trouvé : %d\n", prime);
+    printf("[MASTER] Nouveau premier trouvé : %d\n", prime);
   }
 
-  // Test local (temporaire)
-  int isPrime = 1;
-  printf(" nbprime : %d\n", nb_primes);
-  for (int i = 2; i * i <= nombre; i++) {
-    printf(" nbprime : %d\n", nb_primes);
-    if (nombre % i == 0) {
-      printf(" nbprime : %d\n", nb_primes);
-      isPrime = 0;
-      break;
-    }
+  int resultat;
+  ssize_t r2 = read(pipeWM[0], &resultat, sizeof(resultat));
+  if (r2 != sizeof(resultat)) {
+    perror("[MASTER] read résultat primalité");
+    resultat = 0;  // FAIL
   }
-  printf(" nbprime : %d\n", nb_primes);
 
-  // Envoi du résultat au client
-  int fdRetour = open(FIFO_MASTER_TO_CLIENT, O_WRONLY);
-  printf(" nbprime : %d\n", nb_primes);
-  if (fdRetour != -1) {
-    write(fdRetour, &isPrime, sizeof(isPrime));
-    printf(" nbprime : %d\n", nb_primes);
-    close(fdRetour);
+  if (resultat != 0) {
+    nb_primes++;
+    highest_prime = resultat;
+    printf("[MASTER] SUCCESS : %d est premier\n", resultat);
   } else {
-    printf(" nbprime : %d\n", nb_primes);
-    perror("[MASTER] open FIFO_MASTER_TO_CLIENT (COMPUTE)");
+    printf("[MASTER] FAIL : %d n'est pas premier\n", nombre);
   }
 
-  printf("[MASTER] Résultat envoyé au client : %d (%s)\n", isPrime,
-         isPrime ? "premier" : "non premier");
-  printf(" nbprime : %d\n", nb_primes);
+  int fdRetour = open(FIFO_MASTER_TO_CLIENT, O_WRONLY);
+  if (fdRetour != -1) {
+    write(fdRetour, &resultat, sizeof(resultat));
+    close(fdRetour);
+  } else
+    perror("[MASTER] open retour");
+
+  printf("[MASTER] Résultat envoyé au client : %d\n", resultat);
 }
 
 /************************************************************************
- * boucle principale de communication avec le client
+ * boucle principale
  ************************************************************************/
 void loop(int pipeMW[2], int pipeWM[2]) {
-  while (1) {  // boucle principale du master
-    // === Ouverture de la FIFO côté client ===
+  while (1) {
+    printf("[MASTER] Attente d'un client...\n");
+
     int fdClient = open(FIFO_CLIENT_TO_MASTER, O_RDONLY);
     if (fdClient == -1) {
       perror("[MASTER] open FIFO_CLIENT_TO_MASTER");
       continue;
     }
 
-    // On lit d'abord l'ordre
     int order;
     ssize_t r = read(fdClient, &order, sizeof(order));
+
     if (r == 0) {
-      // rien reçu (client a fermé la FIFO)
       close(fdClient);
       continue;
     }
-    if (r != (ssize_t)sizeof(order)) {
-      fprintf(stderr, "[MASTER] Ordre incomplet reçu (taille=%zd)\n", r);
+    if (r != sizeof(order)) {
+      fprintf(stderr, "[MASTER] Ordre incomplet\n");
       close(fdClient);
       continue;
     }
@@ -161,115 +162,106 @@ void loop(int pipeMW[2], int pipeWM[2]) {
     int nombre = 0;
 
     if (order == ORDER_COMPUTE_PRIME) {
-      // On doit lire le nombre à tester
-      ssize_t rr = read(fdClient, &nombre, sizeof(nombre));
-      if (rr != (ssize_t)sizeof(nombre)) {
-        fprintf(stderr, "[MASTER] Nombre manquant pour ORDER_COMPUTE_PRIME\n");
-        close(fdClient);
-        continue;
-      }
-      printf("[MASTER] Reçu ordre COMPUTE pour %d\n", nombre);
-    } else if (order == ORDER_STOP) {
-      printf("[MASTER] Reçu ordre STOP\n");
-    } else if (order == ORDER_HOW_MANY_PRIME) {
-      printf("[MASTER] Reçu ordre HOW_MANY\n");
-    } else if (order == ORDER_HIGHEST_PRIME) {
-      printf("[MASTER] Reçu ordre HIGHEST\n");
-    } else {
-      printf("[MASTER] Ordre inconnu : %d\n", order);
+      read(fdClient, &nombre, sizeof(nombre));
+      printf("[MASTER] Reçu COMPUTE %d\n", nombre);
+    } else if (order == ORDER_STOP)
+      printf("[MASTER] Reçu STOP\n");
+    else if (order == ORDER_HOW_MANY_PRIME)
+      printf("[MASTER] Reçu HOW_MANY\n");
+    else if (order == ORDER_HIGHEST_PRIME)
+      printf("[MASTER] Reçu HIGHEST\n");
+    else {
+      printf("[MASTER] Ordre inconnu.\n");
       close(fdClient);
       continue;
     }
 
     close(fdClient);
 
-    // === Traitement des ordres ===
-
-    // 1) STOP : on propage -1 aux workers et on répond au client
     if (order == ORDER_STOP) {
       order_stop(pipeMW);
-      break;  // sortir de la boucle principale
+      break;
     }
 
-    // 2) COMPUTE_PRIME : on garde ton pipeline + test local pour l'instant
     if (order == ORDER_COMPUTE_PRIME) {
       order_compute(nombre, pipeMW, pipeWM);
     }
 
-    /*// 3) HOW_MANY : renvoyer nb_primes
-    else if (order == ORDER_HOW_MANY_PRIME) {
-      int fdRetour = open(FIFO_MASTER_TO_CLIENT, O_WRONLY);
-      if (fdRetour != -1) {
-        write(fdRetour, &nb_primes, sizeof(nb_primes));
-        close(fdRetour);
-      } else {
-        perror("[MASTER] open FIFO_MASTER_TO_CLIENT (HOW_MANY)");
-      }
-    }*/
-
-    // 4) HIGHEST : renvoyer highest_prime
     else if (order == ORDER_HIGHEST_PRIME) {
       int fdRetour = open(FIFO_MASTER_TO_CLIENT, O_WRONLY);
       if (fdRetour != -1) {
         write(fdRetour, &highest_prime, sizeof(highest_prime));
         close(fdRetour);
-      } else {
-        perror("[MASTER] open FIFO_MASTER_TO_CLIENT (HIGHEST)");
       }
     }
+
+    else if (order == ORDER_HOW_MANY_PRIME) {
+      int fdRetour = open(FIFO_MASTER_TO_CLIENT, O_WRONLY);
+      if (fdRetour != -1) {
+        write(fdRetour, &nb_primes, sizeof(nb_primes));
+        close(fdRetour);
+      }
+    }
+
+    P(sem_sync);
   }
 }
 
 /************************************************************************
- * boucle principale de communication avec le client
+ * main
  ************************************************************************/
-
 int main(void) {
   printf("[MASTER] Démarrage du master\n");
 
-  // création des FIFOs
   createFifos();
 
-  // création des pipes de communication avec le worker
-  int pipeMW[2];  // master -> worker
-  int pipeWM[2];  // worker -> master
+  key_t key_mutex = ftok("master.c", 'M');
+  key_t key_sync = ftok("master.c", 'S');
+  if (key_mutex == -1 || key_sync == -1) usage("master", "Erreur ftok");
+
+  sem_mutex = semget(key_mutex, 1, IPC_CREAT | 0666);
+  sem_sync = semget(key_sync, 1, IPC_CREAT | 0666);
+  if (sem_mutex == -1 || sem_sync == -1) usage("master", "Erreur semget");
+
+  if (semctl(sem_mutex, 0, SETVAL, 1) == -1 ||
+      semctl(sem_sync, 0, SETVAL, 0) == -1)
+    usage("master", "Erreur semctl");
+
+  int pipeMW[2], pipeWM[2];
   assert(pipe(pipeMW) == 0);
   assert(pipe(pipeWM) == 0);
 
   pid_t pid = fork();
   assert(pid != -1);
 
-  if (pid == 0) {  // processus worker
-    // fermer les descripteurs inutiles
-    closePipes(pipeMW[1],
-               pipeWM[0]);  // écriture vers le worker lecture depuis le worker
+  if (pid == 0) {
+    close(pipeMW[1]);
+    close(pipeWM[0]);
 
-    // exécuter le worker
     char fdReadStr[10], fdWriteStr[10], primeStr[10];
-    snprintf(fdReadStr, sizeof(fdReadStr), "%d",
-             pipeMW[0]);  // lecture du master
-    snprintf(fdWriteStr, sizeof(fdWriteStr), "%d",
-             pipeWM[1]);  // écriture vers le master
+    snprintf(fdReadStr, sizeof(fdReadStr), "%d", pipeMW[0]);
+    snprintf(fdWriteStr, sizeof(fdWriteStr), "%d", pipeWM[1]);
+    snprintf(primeStr, sizeof(primeStr), "%d", 2);
 
-    snprintf(primeStr, sizeof(primeStr), "%d", 2);  // premier initial
     char *args[] = {"worker.o", fdReadStr, fdWriteStr, primeStr, NULL};
     execv("./worker.o", args);
     perror("execv");
-    exit(EXIT_FAILURE);
+    exit(1);
   }
 
-  closePipes(pipeMW[0], pipeWM[1]);  // fermer le pipe de lecture vers le worker
-                                     // et ecriture depuis le worker
-  set_nonblocking(pipeWM[0]);        // lecture non bloquante
+  close(pipeMW[0]);
+  close(pipeWM[1]);
+  set_nonblocking(pipeWM[0]);
 
-  // boucle principale de communication avec le client
   loop(pipeMW, pipeWM);
 
-  // envoi du signal d'arrêt au worker
-  closePipes(pipeMW[1],
-             pipeWM[0]);  // fermer le pipe d'écriture / lecture vers le worker
-  unlinkPipes();           //
-  printf("[MASTER] Fermeture propre du master.\n");
+  close(pipeMW[1]);
+  close(pipeWM[0]);
+  unlinkPipes();
 
+  semctl(sem_mutex, 0, IPC_RMID);
+  semctl(sem_sync, 0, IPC_RMID);
+
+  printf("[MASTER] Fermeture correcte.\n");
   return EXIT_SUCCESS;
 }

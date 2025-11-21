@@ -1,0 +1,273 @@
+0README:Pour compiler :
+0README:- "make" (ou "make all") : compile tout le projet
+0README:- "make <exe>" : compile un seul binaire
+0README:     donc il y a 3 possibilités : "make master", "make worker", "make client"
+0README:- "make <fichier.o>" : compile un seul .c
+0README:     par exemple "make master_client.o" pour compiler master_client.c
+0README:- "make clean" : supprime les .o et les .d
+0README:- "make distclean" : supprime les .o, les .d et les exécutables
+0README:- le Makefile est à adapter si vous ajoutez des fichiers source
+0README:
+0README:Suppression des tubes nommés et des sémaphore :
+0README:- le script rmsempipe.sh est fourni
+0README:- il supprime tous les sémaphores avec les droits 641
+0README:- il supprime les deux tubes nommés avec des noms précisés en dur
+0README:- le script est à adapter pour mettre les noms des tubes que vous avez choisis
+0README:
+0README:Assertions :
+0README:- le module "myassert" fonctionne comme "assert" avec des messages plus clairs
+0README:- cf. myassert.h pour la documentation
+journal.txt:compilation :
+journal.txt:gcc -g -Wall -Wextra -pedantic -std=c99 client.c -o client
+journal.txt:gcc -g -Wall -Wextra -pedantic -std=c99 master.c -o master
+journal.txt:
+journal.txt:
+journal.txt:resumé du projet :
+journal.txt:un client demande a un master si un chiffre est premier ou non
+journal.txt:le master demande a des worker successife si oui ou non
+journal.txt:les workers renvoies le resultat au master qui le renvoit au client
+journal.txt:
+journal.txt:plan de projet :
+journal.txt:etape 1 : comunication client vers master ( arrivé a envoyé quelque chose dans le master a partir du client )
+journal.txt:etape 2 : communication master vers client ( faire le retour, envoyé quelque chose dans le client via le master )
+journal.txt:etape 3 : gestion avec les semaphores ( section critique, icp, ....)
+journal.txt:etape 4 : faire la chaine de worker de calcul
+journal.txt:etape 5 : faire la communication master vers worker
+journal.txt:etape 6 : verif + clean + valgrind
+journal.txt:etape 7 : partie client ( bis )
+journal.txt:
+journal.txt:regle : 
+journal.txt:- noté la progression dans le journal 
+journal.txt:- expliqué ce qu'on a fait 
+journal.txt:- ce qu'on a crée et modifié 
+journal.txt:- comment sa fonctionne
+journal.txt:- les trucs a amelioré
+journal.txt:- session <n+1> <prenom> 
+journal.txt:
+journal.txt:session1 lucas :
+journal.txt:deja il faut que le client demande au master et que le master comprene
+journal.txt:
+journal.txt:./master => tube ouvert 
+journal.txt:./client <arg> <n> => envoie les infos dans le tube
+journal.txt:-master capte les infos et les printf
+journal.txt:
+journal.txt:session1 dans "/test client-master"
+journal.txt:
+journal.txt:
+journal.txt:fin de session 1
+journal.txt:resume : 
+journal.txt:usage : 
+journal.txt:- terminal 1 : ./master
+journal.txt:- terminal 2 : ./client 50 ( nbr aleatoire on s'en fou pour l'instant )
+journal.txt:
+journal.txt:ordre : 
+journal.txt:master crée le tube "client_to_master.fifo"
+journal.txt:master ouvre le tube et attend 
+journal.txt:
+journal.txt:on lance le client
+journal.txt:le client ouvre le tube en ecriture
+journal.txt:et il ecrit un nombre ( ici 50 ) dans le tube
+journal.txt:et close le tube
+journal.txt:
+journal.txt:le master detecte l'ecriture du client
+journal.txt:read le nombre
+journal.txt:le printf
+journal.txt:ferme le tube
+journal.txt:le detruit
+journal.txt:
+journal.txt:
+journal.txt:prochain etape : 
+journal.txt:implementé la version minimaliste de client vers master avec les fichiers données et les options specials
+journal.txt:
+journal.txt:session 2 :
+journal.txt:envoie de client vers master fait 
+journal.txt:
+journal.txt:debut master to worker :
+journal.txt:OK ENGROS
+journal.txt:on stocke le plus grand nombre premier et le dernier nombre testé
+journal.txt:premier lancé
+journal.txt:plus grand nombre premier : 2 
+journal.txt:dernier nombre testé : 2 
+journal.txt:j'envoie 2
+journal.txt:le worker 2 est nativement crée
+journal.txt:si je lui envoie 19 ( premier )
+journal.txt:donc il est pas divisibile par 2
+journal.txt:et ducoup on teste tout les nombre de 2 a 11
+journal.txt:2 passe dans le w2
+journal.txt:3 passe pas le w2
+journal.txt:w3 est crée 
+journal.txt:4 capté par w2
+journal.txt:5 passe pas w2 et w3
+journal.txt:w5 est crée 
+journal.txt:6 capté par w2
+journal.txt:7 passe pas w2 w3 w5 
+journal.txt:w7 crée
+journal.txt:8 capté par w2
+journal.txt:9 capté par w3
+journal.txt:10 capté par w2
+journal.txt:11 passe pas w2 w3 w5 w7 
+journal.txt:w11 crée
+journal.txt:11 capté par w11
+journal.txt:11 premier
+journal.txt:
+journal.txt:session 3 :
+journal.txt:/test master-worker/test
+journal.txt:version minimaliste fonctionnelle du projet
+journal.txt:terminal 1 : ./master
+journal.txt:terminal 2 : ./client <n> ( ex : ./client 19)
+journal.txt:
+journal.txt:pour tout fermé - terminal 2 : ./client -1
+journal.txt:
+journal.txt:a faire
+journal.txt:gestion avec toute les options du profs
+Makefile:
+Makefile:SHELL = /bin/bash
+Makefile:
+Makefile:INSTALL = cp
+Makefile:INSTALL_PROGRAM = $(INSTALL)
+Makefile:INSTALL_DATA    = $(INSTALL)
+Makefile:
+Makefile:#########################################################
+Makefile:# Compiler and options
+Makefile:#########################################################
+Makefile:
+Makefile:CC = gcc
+Makefile:CPP = gcc -E
+Makefile:
+Makefile:INCDIR = -I.
+Makefile:
+Makefile:#CPPFLAGS = $(INCDIR)
+Makefile:CPPFLAGS = $(INCDIR) -DHAVE_CONFIG_H
+Makefile:#CPPFLAGS = $(INCDIR) -D_XOPEN_SOURCE=500 -DHAVE_CONFIG_H
+Makefile:#CPPFLAGS = $(INCDIR) -D_XOPEN_SOURCE=500 -DNDEBUG
+Makefile:
+Makefile:# -fPIC pour que les .o générés puissent être utilisés sur diverses
+Makefile:# architectures
+Makefile:CFLAGS = -g -Wall -Wextra -pedantic -std=c99 -fPIC
+Makefile:#CFLAGS = -O -Wall -Wextra -pedantic -std=c99 -fPIC
+Makefile:
+Makefile:
+Makefile:#LIBS = -ljpeg -lXaw -lm
+Makefile:LIBS = -lm -lpthread
+Makefile:
+Makefile:#LDFLAGS = -L/usr/local/X11R6/lib -L../jpeg $(LIBS)
+Makefile:LDFLAGS = $(LIBS)
+Makefile:
+Makefile:
+Makefile:
+Makefile:#########################################################
+Makefile:# Common prefix for installation directories.
+Makefile:#########################################################
+Makefile:
+Makefile:#prefix = /usr/local
+Makefile:prefix = .
+Makefile:exec_prefix = ${prefix}
+Makefile:
+Makefile:bindir  = ${exec_prefix}/bin
+Makefile:sbindir = ${exec_prefix}/sbin
+Makefile:libexecdir = ${exec_prefix}/libexec
+Makefile:
+Makefile:libdir = ${exec_prefix}/lib
+Makefile:infodir = ${prefix}/info
+Makefile:includedir = ${prefix}/include
+Makefile:mandir = ${prefix}/man
+Makefile:
+Makefile:srcdir  = .
+Makefile:
+Makefile:
+Makefile:#########################################################
+Makefile:# bin, sources, ...
+Makefile:#########################################################
+Makefile:
+Makefile:BIN1 = client
+Makefile:SRC1 = client.c master_client.c myassert.c
+Makefile:OBJ1 = $(subst .c,.o,$(SRC1))
+Makefile:DFILES1 = $(subst .c,.d,$(SRC1))
+Makefile:
+Makefile:BIN2 = master
+Makefile:SRC2 = master.c master_client.c master_worker.c myassert.c
+Makefile:OBJ2 = $(subst .c,.o,$(SRC2))
+Makefile:DFILES2 = $(subst .c,.d,$(SRC2))
+Makefile:
+Makefile:BIN3 = worker
+Makefile:SRC3 = worker.c master_worker.c myassert.c
+Makefile:OBJ3 = $(subst .c,.o,$(SRC3))
+Makefile:DFILES3 = $(subst .c,.d,$(SRC3))
+Makefile:
+Makefile:BIN = $(BIN1) $(BIN2) $(BIN3)
+Makefile:SRC = $(SRC1) $(SRC2) $(SRC3)
+Makefile:OBJ = $(OBJ1) $(OBJ2) $(OBJ3)
+Makefile:DFILES = $(DFILES1) $(DFILES2) $(DFILES3)
+Makefile:
+Makefile:
+Makefile:#########################################################
+Makefile:# explicite rules
+Makefile:#########################################################
+Makefile:
+Makefile:all: $(BIN)
+Makefile:
+Makefile:$(BIN1): $(OBJ1)
+Makefile:	@echo "creating" $@
+Makefile:	@$(CC) $(CFLAGS) -o $@ $(OBJ1) $(LDFLAGS)
+Makefile:#	@echo "end creating" $@ "======================================="
+Makefile:
+Makefile:$(BIN2): $(OBJ2)
+Makefile:	@echo "creating" $@
+Makefile:	@$(CC) $(CFLAGS) -o $@ $(OBJ2) $(LDFLAGS)
+Makefile:#	@echo "end creating" $@ "======================================="
+Makefile:
+Makefile:$(BIN3): $(OBJ3)
+Makefile:	@echo "creating" $@
+Makefile:	@$(CC) $(CFLAGS) -o $@ $(OBJ3) $(LDFLAGS)
+Makefile:#	@echo "end creating" $@ "======================================="
+Makefile:
+Makefile:
+Makefile:
+Makefile:#########################################################
+Makefile:# generic rules
+Makefile:#########################################################
+Makefile:install:
+Makefile:	@echo install to do
+Makefile:
+Makefile:uninstall:
+Makefile:	@echo uninstall to do
+Makefile:
+Makefile:clean:
+Makefile:	@echo "deleting" $(OBJ) $(DFILES)
+Makefile:	@$(RM) $(OBJ) $(DFILES)
+Makefile:
+Makefile:distclean: clean
+Makefile:	@echo "deleting" $(BIN)
+Makefile:	@$(RM) $(BIN)
+Makefile:
+Makefile:mostlyclean:
+Makefile:	@echo mostlyclean to do
+Makefile:
+Makefile:maintainer-clean:
+Makefile:	@echo maintainer-clean to do
+Makefile:
+Makefile:TAGS:
+Makefile:	@echo TAGS to do
+Makefile:
+Makefile:info:
+Makefile:	@echo info to do
+Makefile:
+Makefile:
+Makefile:#########################################################
+Makefile:# Implicite rules
+Makefile:#########################################################
+Makefile:
+Makefile:#.SILENT:
+Makefile:
+Makefile:.SUFFIXES : .c .o .d
+Makefile:
+Makefile:%.o : %.c
+Makefile:	@echo 'compiling' $< ;\
+Makefile:	$(CC) $(CFLAGS) -c $(CPPFLAGS) $< -o $@ ;
+Makefile:
+Makefile:%.d : %.c
+Makefile:	@$(SHELL) -ec '$(CC) -MM $(CPPFLAGS) $< \
+Makefile:	   | sed '\''s/\($*\.o\)[ :]*/\1 $@ : /g'\'' > $@' ;
+Makefile:
+Makefile:# include dependance files
+Makefile:-include $(DFILES)

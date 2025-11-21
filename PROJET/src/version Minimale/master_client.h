@@ -25,7 +25,7 @@
 
 
 void createFifos(); //crée les fifos 
-void closePipes(int pipe1, int pipe2); // ferme les pipes
+void closePipes(int pipe1, int pipe2); // ferme les pipeds
 void unlinkPipes(); //supprime les pipes
 
 #endif
