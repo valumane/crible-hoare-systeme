@@ -64,16 +64,16 @@ int order_compute(int nombre, int pipeMW[2], int pipeWM[2]) {
       // si c'était le dernier (== nombre), on mémorise son verdict
       if (i == nombre) {
         if (msg > 0) {
-          resultat = nombre;  // nombre est premier
+          resultat = nombre;  // nombre  premier
         } else {
-          resultat = 0;  // nombre n'est pas premier
+          resultat = 0;  // nombre pas premier
         }
       }
     }
 
     last_tested = nombre;
   }
-  // Cas 2 : nombre <= last_tested  → on le reteste tout seul
+  // Cas 2 : nombre <= last_tested -> on le reteste tout seul
   else {
     if (write(pipeMW[1], &nombre, sizeof(nombre)) != sizeof(nombre)) {
       perror("[MASTER] write pipeMW (retest)");
@@ -87,7 +87,7 @@ int order_compute(int nombre, int pipeMW[2], int pipeWM[2]) {
     }
 
     if (msg > 0) {
-      // on évite de gonfler nb_primes si c’est un premier déjà connu
+      // évite de gonfler nb_primes si c’est un premier déjà connu
       if (msg > highest_prime) {
         highest_prime = msg;
         nb_primes++;
@@ -170,7 +170,7 @@ void loop(int sem_sync, int pipeMW[2], int pipeWM[2]) {
     if (order == ORDER_STOP) {
       int stopVal = -1;
       write(pipeMW[1], &stopVal,
-            sizeof(stopVal));  // propage STOP dans le pipeline
+            sizeof(stopVal));  // propage stop dans le pipeline
       break;
     }
   }
@@ -193,22 +193,14 @@ int main(int argc, char *argv[]) {
   int sem_mutex = semget(key_mutex, 1, IPC_CREAT | 0666);
   int sem_sync = semget(key_sync, 1, IPC_CREAT | 0666);
 
-  if (sem_mutex == -1 || sem_sync == -1) {
-    perror("[MASTER] semget");
-    exit(EXIT_FAILURE);
-  }
-
   semctl(sem_mutex, 0, SETVAL, 1);  // mutex client
   semctl(sem_sync, 0, SETVAL, 0);   // sync client/master
 
   // --- pipes pour le pipeline Hoare ---
   int pipeMW[2], pipeWM[2];
-  assert(pipe(pipeMW) == 0);
-  assert(pipe(pipeWM) == 0);
 
   // --- création du premier worker (prime = 2) ---
   int pid = fork();
-  assert(pid != -1);
 
   if (pid == 0) {
     // process worker

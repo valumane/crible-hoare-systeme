@@ -4,10 +4,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-// #include <stdbool.h>
-
-// #include "myassert.h"
-
 #include <assert.h>
 #include <fcntl.h>
 #include <sys/wait.h>
@@ -30,10 +26,8 @@ static void usage(const char *exeName, const char *message) {
   exit(EXIT_FAILURE);
 }
 
-static void parseArgs(int argc, char *argv[] /*, structure à remplir*/) {
+static void parseArgs(int argc, char *argv[]) {
   if (argc != 4) usage(argv[0], "Nombre d'arguments incorrect");
-
-  // remplir la structure
 }
 
 /* =====================================================================
@@ -59,13 +53,13 @@ void loop(int fdRead, int *hasNext, int nextPipe[2], int fdWriteMaster,
       break;
     }
 
-    /* --- CAS N == PRIME : SUCCÈS --- */
+    /* --- CAS N == PRIME : SUCCES --- */
     if (n == myPrime) {
       write(fdWriteMaster, &n, sizeof(int));
       continue;
     }
 
-    /* --- CAS divisible : ÉCHEC --- */
+    /* --- CAS divisible : ECHEC --- */
     if (n % myPrime == 0) {
       int fail = 0;
       write(fdWriteMaster, &fail, sizeof(int));
@@ -103,8 +97,8 @@ void loop(int fdRead, int *hasNext, int nextPipe[2], int fdWriteMaster,
   }
 }
 
-/* =====================================================================
- * MAIN
+/* ======================================================================
+ *  MAIN
  * ===================================================================== */
 int main(int argc, char *argv[]) {
   parseArgs(argc, argv);
@@ -115,7 +109,7 @@ int main(int argc, char *argv[]) {
 
   printf("[WORKER] (pid=%d) : gère %d\n", getpid(), myPrime);
 
-  /* Au démarrage, un worker renvoie immédiatement son premier au master */
+  /* au démarrage, un worker renvoie immédiatement son premier au master */
   write(fdWriteMaster, &myPrime, sizeof(myPrime));
 
   int nextPipe[2] = {-1, -1};

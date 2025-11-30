@@ -5,17 +5,17 @@
 #define _XOPEN_SOURCE
 
 #include <assert.h>
-#include <errno.h>  // <-- pour errno si tu veux gérer les erreurs
+#include <pthread.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include <sys/stat.h>  // <-- pour mkfifo()
 #include <unistd.h>    // <-- pour close() et unlink()
-#include <pthread.h>
-#include <stdbool.h>
+
 #include "master_client.h"
-#include <string.h>
 
 // sema
 void P(int semid) {
@@ -113,20 +113,17 @@ void clientSendOrder(int fdOut, int order, int number) {
   }
 }
 
-
 int mysqrt(int n) {
-    if (n <= 0) return 0;
-    int x = n;
-    int y = (x + 1) / 2;
+  if (n <= 0) return 0;
+  int x = n;
+  int y = (x + 1) / 2;
 
-    while (y < x) {
-        x = y;
-        y = (x + n / x) / 2;
-    }
-    return x;  // valeur entière de sqrt(n)
+  while (y < x) {
+    x = y;
+    y = (x + n / x) / 2;
+  }
+  return x;  // valeur entière de sqrt(n)
 }
-
-
 
 typedef struct {
   bool *tab;
@@ -149,7 +146,6 @@ void *threadMark(void *arg) {
   return NULL;
 }
 
-
 void mode_local(int number) {
   // =======================
   // 1) tab booléens
@@ -157,7 +153,9 @@ void mode_local(int number) {
 
   bool *tab = malloc(sizeof(bool) * (number + 1));
 
-  for (int i = 2; i <= number; i++) tab[i] = true;
+  for (int i = 2; i <= number; i++) {
+    tab[i] = true;
+  }
 
   // =======================
   // 2) preparer threads
@@ -189,7 +187,9 @@ void mode_local(int number) {
   // 4) join les threads
   // =======================
 
-  for (int i = 0; i < nbThreads; i++) pthread_join(tids[i], NULL);
+  for (int i = 0; i < nbThreads; i++) {
+    pthread_join(tids[i], NULL);
+  }
 
   pthread_mutex_destroy(&mutex);
 
@@ -198,8 +198,11 @@ void mode_local(int number) {
   // =======================
 
   printf("Premiers trouvés jusqu'à %d :\n", number);
-  for (int i = 2; i <= number; i++)
-    if (tab[i]) printf("%d ", i);
+  for (int i = 2; i <= number; i++) {
+    if (tab[i]) {
+      printf("%d ", i);
+    }
+  }
 
   printf("\n");
 
@@ -212,11 +215,7 @@ void show_worker(int argc, char *argv[]) {
   /* ======= MODE SPÉCIAL : ./client showworker ======= */
   if (argc == 2 && strcmp(argv[1], "showworker") == 0) {
     fprintf(stdout, "ps -C worker.o -o stat,cmd | grep -E 'R|S|D|I'\n");
-    // Affiche uniquement les workers en état R, S, D ou I
-    int ret = system("ps -C worker.o -o stat,cmd | grep -E 'R|S|D|I'");
-    if (ret == -1) {
-      perror("[CLIENT] system ps");
-    }
+    system("ps -C worker.o -o stat,cmd | grep -E 'R|S|D|I'");
   }
   /* ================================================== */
 }
