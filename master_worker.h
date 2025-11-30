@@ -5,5 +5,7 @@
 //    - des constantes pour rendre plus lisible les comunications
 //    - des fonctions communes (écriture dans un tube, ...)
 
+void init_semaphores(int *sem_mutex, int *sem_sync);
+void launch_worker(int prime, int pipeMW[2], int pipeWM[2]);
 
 #endif

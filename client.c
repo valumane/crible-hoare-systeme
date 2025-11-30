@@ -110,13 +110,13 @@ int main(int argc, char *argv[]) {
   P(sem_mutex);
 
   int fdOut = open(FIFO_CLIENT_TO_MASTER, O_WRONLY);
-  int w = write(fdOut, &order, sizeof(order));
-  myassert(w == (int)sizeof(order),"write ordre vers le master a échoué");
+ int w = write(fdOut, &order, sizeof(order));
+myassert(w == (int)sizeof(order),"write ordre vers le master a échoué");
 
-  if (order == ORDER_COMPUTE_PRIME){
-    write(fdOut, &number, sizeof(number));
-    myassert(w == (int)sizeof(number),"write nombre vers le master a échoué");
-  }
+if (order == ORDER_COMPUTE_PRIME){
+  w = write(fdOut, &number, sizeof(number));
+  myassert(w == (int)sizeof(number),"write nombre vers le master a échoué");
+}
   myassert(close(fdOut) != -1, "close(fdOut) a échoué");
 
   int fdIn = open(FIFO_MASTER_TO_CLIENT, O_RDONLY);

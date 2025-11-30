@@ -191,25 +191,9 @@ int main(int argc, char *argv[]) {
 
   createFifos();
 
-    createFifos();
-
   // --- sémaphores ---
-  int key_mutex = ftok("master.c", 'M');
-  int key_sync  = ftok("master.c", 'S');
-
-  myassert(key_mutex != -1, "ftok(\"master.c\", 'M') a échoué");
-  myassert(key_sync  != -1, "ftok(\"master.c\", 'S') a échoué");
-
-  int sem_mutex = semget(key_mutex, 1, IPC_CREAT | 0666);
-  int sem_sync  = semget(key_sync, 1, IPC_CREAT | 0666);
-
-  myassert(sem_mutex != -1, "semget(sem_mutex) a échoué");
-  myassert(sem_sync  != -1, "semget(sem_sync) a échoué");
-
-  myassert(semctl(sem_mutex, 0, SETVAL, 1) != -1,
-           "semctl(sem_mutex, SETVAL) a échoué");
-  myassert(semctl(sem_sync, 0, SETVAL, 0) != -1,
-           "semctl(sem_sync, SETVAL) a échoué");
+  int sem_mutex, sem_sync;
+  init_semaphores(&sem_mutex, &sem_sync);
 
   // --- pipes pour le pipeline Hoare ---
   int pipeMW[2], pipeWM[2];
@@ -221,26 +205,14 @@ int main(int argc, char *argv[]) {
   int pid = fork();
   myassert(pid != -1, "fork pour le premier worker a échoué");
 
-
   if (pid == 0) {
     // process worker
-    closePipes(pipeMW[1], pipeWM[0]);
-
-    char rStr[10], wStr[10], pStr[10];
-    snprintf(rStr, sizeof(rStr), "%d", pipeMW[0]);
-    snprintf(wStr, sizeof(wStr), "%d", pipeWM[1]);
-    snprintf(pStr, sizeof(pStr), "%d", 2);
-
-    char *args[] = {"worker", rStr, wStr, pStr, NULL};
-    execv("./worker", args);
-    perror("execv");
-    exit(EXIT_FAILURE);
+    launch_worker(2, pipeMW, pipeWM);
   }
 
   // process master
   closePipes(pipeMW[0], pipeWM[1]);
 
-  // lire le tout premier premier envoyé par le worker 2
   // lire le tout premier premier envoyé par le worker 2
   int firstPrime = 0;
   int r = read(pipeWM[0], &firstPrime, sizeof(firstPrime));
