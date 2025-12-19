@@ -1,6 +1,6 @@
-projet pour la matiere Programmation C avancé
+--Projet pour la matiere Programmation C avancé--
 
-le but etait de crée un pipeline de processus worker,
+Le but etait de crée un pipeline de processus worker,
 pour simuler le crible de hoare
 
 utilisation : 
@@ -13,6 +13,18 @@ dans un deuxieme terminal vous lancé ./client
 ./client stop -> stop tout
 
 compilation : 
-make -> pour tout compilé
-make clean -> pour enlevé les .o
-make distclean -> pour enlevé les executables
+Pour compiler :
+- "make" (ou "make all") : compile tout le projet
+- "make <exe>" : compile un seul binaire
+     donc il y a 3 possibilités : "make master", "make worker", "make client"
+- "make <fichier.o>" : compile un seul .c
+     par exemple "make master_client.o" pour compiler master_client.c
+- "make clean" : supprime les .o et les .d
+- "make distclean" : supprime les .o, les .d et les exécutables
+- le Makefile est à adapter si vous ajoutez des fichiers source
+
+Suppression des tubes nommés et des sémaphore :
+- le script rmsempipe.sh est fourni
+- il supprime tous les sémaphores avec les droits 641
+- il supprime les deux tubes nommés avec des noms précisés en dur
+- le script est à adapter pour mettre les noms des tubes que vous avez choisis
