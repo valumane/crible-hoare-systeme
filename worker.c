@@ -2,14 +2,15 @@
 #include "config.h"
 #endif
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <assert.h>
 #include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include "myassert.h"
+
 #include "master_worker.h"
+#include "myassert.h"
 
 /************************************************************************
  * Usage et analyse des arguments passés en ligne de commande
@@ -38,17 +39,13 @@ void loop(int fdRead, int *hasNext, int nextPipe[2], int fdWriteMaster,
   while (1) {
     int n = 0;
     int r = read(fdRead, &n, sizeof(int));
-    myassert(r != -1, "[WORKER] read(fdRead) a échoué");
 
     if (r == 0) break;
 
     /* --- CAS STOP --- */
-     if (n == -1) {
+    if (n == -1) {
       if (*hasNext) {
         int w = write(nextPipe[1], &n, sizeof(int));
-        myassert(w == (int)sizeof(int),"[WORKER] write STOP vers le worker suivant a échoué");
-
-        myassert(close(nextPipe[1]) != -1,"[WORKER] close(nextPipe[1]) a échoué");
         waitpid(*nextPid, NULL, 0);
         *hasNext = 0;  // déjà nettoyé, rien à refaire après la boucle
       }
@@ -60,7 +57,6 @@ void loop(int fdRead, int *hasNext, int nextPipe[2], int fdWriteMaster,
     /* --- CAS N == PRIME : SUCCES --- */
     if (n == myPrime) {
       int w = write(fdWriteMaster, &n, sizeof(int));
-      myassert(w == (int)sizeof(int),"[WORKER] write(n==myPrime) vers master a échoué");
       continue;
     }
 
@@ -68,21 +64,15 @@ void loop(int fdRead, int *hasNext, int nextPipe[2], int fdWriteMaster,
     if (n % myPrime == 0) {
       int fail = 0;
       int w = write(fdWriteMaster, &fail, sizeof(int));
-      myassert(w == (int)sizeof(int),"[WORKER] write(fail) vers master a échoué");
       continue;
     }
 
     /* --- CAS N NON DIVISIBLE : transmettre au suivant --- */
-        if (!(*hasNext)) {
+    if (!(*hasNext)) {
       *hasNext = 1;
-      myassert(pipe(nextPipe) == 0, "[WORKER] pipe(nextPipe) a échoué");
-
       *nextPid = fork();
-      myassert(*nextPid != -1, "[WORKER] fork() pour le worker suivant a échoué");
 
       if (*nextPid == 0) {
-        myassert(close(nextPipe[1]) != -1, "[WORKER] close(nextPipe[1]) (fils) a échoué");
-
         char fdReadStr[10], fdWriteStr[10], primeStr[10];
         snprintf(fdReadStr, sizeof(fdReadStr), "%d", nextPipe[0]);
         snprintf(fdWriteStr, sizeof(fdWriteStr), "%d", fdWriteMaster);
@@ -94,14 +84,11 @@ void loop(int fdRead, int *hasNext, int nextPipe[2], int fdWriteMaster,
         exit(EXIT_FAILURE);
       }
 
-      myassert(close(nextPipe[0]) != -1, "[WORKER] close(nextPipe[0]) (père) a échoué");
       printf("[WORKER %d] a créé worker %d (pid=%d)\n", myPrime, n, *nextPid);
 
     } else {
       int w = write(nextPipe[1], &n, sizeof(int));
-      myassert(w == (int)sizeof(int), "[WORKER] write vers worker suivant a échoué");
     }
-
   }
 }
 
@@ -117,9 +104,8 @@ int main(int argc, char *argv[]) {
 
   printf("[WORKER] (pid=%d) : gère %d\n", getpid(), myPrime);
 
-    /* au démarrage, un worker renvoie immédiatement son premier au master */
+  /* au démarrage, un worker renvoie immédiatement son premier au master */
   int w = write(fdWriteMaster, &myPrime, sizeof(myPrime));
-  myassert(w == (int)sizeof(myPrime), "[WORKER] write premier myPrime vers master a échoué");
 
   int nextPipe[2] = {-1, -1};
   int nextPid = -1;
@@ -128,7 +114,6 @@ int main(int argc, char *argv[]) {
   loop(fdRead, &hasNext, nextPipe, fdWriteMaster, myPrime, &nextPid);
 
   if (hasNext) {
-    myassert(close(nextPipe[1]) != -1, "[WORKER] close(nextPipe[1]) final a échoué");
     waitpid(nextPid, NULL, 0);
   }
 
